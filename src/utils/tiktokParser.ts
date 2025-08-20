@@ -200,12 +200,53 @@ export function extractTikTokData(html: string): TikTokData {
     }
   });
   
+  // NEW: Try to extract from __UNIVERSAL_DATA_FOR_REHYDRATION__
+  const universalDataScript = $('#__UNIVERSAL_DATA_FOR_REHYDRATION__');
+  if (universalDataScript.length) {
+    try {
+      const universalData = JSON.parse(universalDataScript.html() || '{}');
+      if (universalData.__DEFAULT_SCOPE__) {
+        const userDetail = universalData.__DEFAULT_SCOPE__['webapp.user-detail'];
+        if (userDetail && userDetail.userInfo) {
+          const userInfo = userDetail.userInfo;
+          
+          // Extract user data
+          if (userInfo.user) {
+            user.username = userInfo.user.uniqueId || user.username;
+            user.displayName = userInfo.user.nickname || user.displayName;
+            user.userImage = userInfo.user.avatarLarger || userInfo.user.avatarMedium || user.userImage;
+            user.description = userInfo.user.signature || user.description;
+          }
+          
+          // Extract stats
+          if (userInfo.stats) {
+            user.followers = userInfo.stats.followerCount || user.followers;
+            user.totalLikes = userInfo.stats.heartCount || userInfo.stats.heart || user.totalLikes;
+          }
+          
+          console.log('Extracted user from UNIVERSAL_DATA:', {
+            username: user.username,
+            followers: user.followers,
+            totalLikes: user.totalLikes
+          });
+        }
+      }
+    } catch (e) {
+      console.log('Failed to parse UNIVERSAL_DATA:', e);
+    }
+  }
+  
   // Extract videos
   const videos: TikTokVideo[] = [];
   let pinnedVideosSkipped = 0;
   
   // Look for video containers - TikTok often uses data attributes
-  $('[data-e2e="user-post-item"], [class*="video-feed-item"], a[href*="/video/"]').each((_, elem) => {
+  // First try the new structure with data-e2e="user-post-item"
+  const postItems = $('[data-e2e="user-post-item"]');
+  console.log(`Found ${postItems.length} post items with data-e2e="user-post-item"`);
+  
+  if (postItems.length > 0) {
+    postItems.each((_, elem) => {
     const $elem = $(elem);
     
     // Check if this is a pinned video
@@ -239,23 +280,87 @@ export function extractTikTokData(html: string): TikTokData {
         video.title = img.attr('alt') || '';
       }
       
-      // Look for view count
-      $elem.find('[class*="view"], [data-e2e*="view"], strong').each((_, viewElem) => {
-        const text = $(viewElem).text();
-        const viewMatch = text.match(/(\d+\.?\d*[KMB]?)/);
+      // Look for view count - in the new structure, it's in a strong tag
+      const viewCount = $elem.find('strong').first().text();
+      console.log(`Video ${video.id} view text: ${viewCount}`);
+      if (viewCount) {
+        const viewMatch = viewCount.match(/(\d+\.?\d*[KMB]?)/);
         if (viewMatch) {
-          const views = parseFormattedNumber(viewMatch[1]);
-          if (views > video.views) {
-            video.views = views;
-          }
+          video.views = parseFormattedNumber(viewMatch[1]);
         }
-      });
+      }
+      
+      // Also try other selectors if views not found
+      if (!video.views) {
+        $elem.find('[class*="view"], [data-e2e*="view"]').each((_, viewElem) => {
+          const text = $(viewElem).text();
+          const viewMatch = text.match(/(\d+\.?\d*[KMB]?)/);
+          if (viewMatch) {
+            const views = parseFormattedNumber(viewMatch[1]);
+            if (views > video.views) {
+              video.views = views;
+            }
+          }
+        });
+      }
       
       videos.push(video);
     }
   });
+  } else {
+    // If no data-e2e="user-post-item" found, try the old approach
+    $('[class*="video-feed-item"], a[href*="/video/"]').each((_, elem) => {
+      const $elem = $(elem);
+      
+      // Check if this is a pinned video
+      const isPinned = $elem.find('[class*="pinned"], [data-e2e*="pinned"], svg[data-e2e="pin-icon"]').length > 0 ||
+                       $elem.text().toLowerCase().includes('pinned') ||
+                       $elem.find('[aria-label*="Pinned"]').length > 0;
+      
+      if (isPinned) {
+        console.log('Skipping pinned video');
+        pinnedVideosSkipped++;
+        return; // Skip this video
+      }
+      
+      // Extract video ID from href
+      const href = $elem.attr('href') || $elem.find('a').attr('href');
+      const videoIdMatch = href?.match(/\/video\/(\d+)/);
+      
+      if (videoIdMatch) {
+        const video: TikTokVideo = {
+          id: videoIdMatch[1],
+          title: '',
+          views: 0,
+          imageUrl: '',
+          url: href?.startsWith('http') ? href : `https://www.tiktok.com${href}`
+        };
+        
+        // Find image within the video element
+        const img = $elem.find('img').first();
+        if (img.length) {
+          video.imageUrl = img.attr('src') || '';
+          video.title = img.attr('alt') || '';
+        }
+        
+        // Look for view count
+        $elem.find('[class*="view"], [data-e2e*="view"], strong').each((_, viewElem) => {
+          const text = $(viewElem).text();
+          const viewMatch = text.match(/(\d+\.?\d*[KMB]?)/);
+          if (viewMatch) {
+            const views = parseFormattedNumber(viewMatch[1]);
+            if (views > video.views) {
+              video.views = views;
+            }
+          }
+        });
+        
+        videos.push(video);
+      }
+    });
+  }
   
-  // If we didn't find videos with the first approach, try alternative selectors
+  // If we still didn't find videos, try alternative selectors
   if (videos.length === 0) {
     // Look for divs that contain video thumbnails
     $('div[class*="DivWrapper"], div[class*="video"], div[class*="item"]').each((_, elem) => {

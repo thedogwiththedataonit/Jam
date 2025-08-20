@@ -1,12 +1,16 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Suspense } from 'react';
+import { Suspense, useState } from 'react';
 import CPMAnalyzer from "@/components/CPMAnalyzer";
+import MultiCreatorCPMAnalyzer from "@/components/MultiCreatorCPMAnalyzer";
 import ThemeToggle from "@/components/ThemeToggle";
-import { Activity } from 'lucide-react';
+import { Activity, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 export default function Home() {
+  const [isMultiMode, setIsMultiMode] = useState(false);
+  
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -32,6 +36,17 @@ export default function Home() {
               </div>
             </motion.div>
             <div className="flex items-center gap-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsMultiMode(!isMultiMode)}
+                className="flex items-center gap-2"
+              >
+                {isMultiMode ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
+                <span className="hidden sm:inline">
+                  {isMultiMode ? 'Multi' : 'Single'} Creator
+                </span>
+              </Button>
               <span className="text-xs font-medium text-muted-foreground hidden sm:block">
                 TikTok CPM Calculator
               </span>
@@ -49,7 +64,7 @@ export default function Home() {
           transition={{ duration: 0.5 }}
         >
           <Suspense fallback={<div className="text-sm text-muted-foreground">Loading…</div>}>
-            <CPMAnalyzer />
+            {isMultiMode ? <MultiCreatorCPMAnalyzer /> : <CPMAnalyzer />}
           </Suspense>
         </motion.div>
       </main>
