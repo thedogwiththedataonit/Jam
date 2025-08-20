@@ -1,6 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import { Suspense } from 'react';
 import CPMAnalyzer from "@/components/CPMAnalyzer";
 import ThemeToggle from "@/components/ThemeToggle";
 import { Activity } from 'lucide-react';
@@ -47,7 +48,9 @@ export default function Home() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <CPMAnalyzer />
+          <Suspense fallback={<div className="text-sm text-muted-foreground">Loading…</div>}>
+            <CPMAnalyzer />
+          </Suspense>
         </motion.div>
       </main>
     </div>

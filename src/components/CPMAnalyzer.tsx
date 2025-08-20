@@ -236,7 +236,7 @@ export default function CPMAnalyzer() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-foreground">Partnership Vibe Check 🔥</h2>
-          <p className="text-muted-foreground mt-1">Find out if this creator got aura or if they're cooked</p>
+          <p className="text-muted-foreground mt-1">Find out if this creator got aura or if they&apos;re cooked</p>
         </div>
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
@@ -276,7 +276,7 @@ export default function CPMAnalyzer() {
               Input Details
             </CardTitle>
             <CardDescription>
-              Drop the deets and let's see if this creator is bussin' or cooked
+              Drop the deets and let&apos;s see if this creator is bussin&apos; or cooked
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -528,7 +528,7 @@ export default function CPMAnalyzer() {
                   <CardTitle className="text-lg font-medium">
                     The Tea ☕
                   </CardTitle>
-                  <CardDescription>No cap assessment of this creator's vibe</CardDescription>
+                  <CardDescription>No cap assessment of this creator&apos;s vibe</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

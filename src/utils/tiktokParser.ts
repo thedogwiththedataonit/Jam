@@ -5,6 +5,7 @@ export interface TikTokUser {
   displayName: string;
   userImage: string;
   followers: number;
+  totalLikes?: number;
   description?: string;
 }
 
@@ -19,6 +20,36 @@ export interface TikTokVideo {
 export interface TikTokData {
   user: TikTokUser;
   videos: TikTokVideo[];
+}
+
+export interface FormattedTikTokDataUserStats {
+  followers: number;
+  totalLikes: number;
+}
+
+export interface FormattedTikTokDataUser {
+  username: string;
+  displayName: string;
+  profileImageUrl: string;
+  description: string;
+  stats: FormattedTikTokDataUserStats;
+}
+
+export interface FormattedTikTokDataVideoStats {
+  views: number;
+}
+
+export interface FormattedTikTokDataVideo {
+  id: string;
+  title: string;
+  url: string;
+  thumbnailUrl: string;
+  stats: FormattedTikTokDataVideoStats;
+}
+
+export interface FormattedTikTokData {
+  user: FormattedTikTokDataUser;
+  videos: FormattedTikTokDataVideo[];
 }
 
 /**
@@ -84,7 +115,8 @@ export function extractTikTokData(html: string): TikTokData {
     username: '',
     displayName: '',
     userImage: '',
-    followers: 0
+    followers: 0,
+    totalLikes: 0
   };
   
   // Try to find username from various possible locations
@@ -111,6 +143,10 @@ export function extractTikTokData(html: string): TikTokData {
   if (followersElement.length) {
     user.followers = parseFormattedNumber(followersElement.text());
   }
+  const likesElement = $('[data-e2e="likes-count"]');
+  if (likesElement.length) {
+    user.totalLikes = parseFormattedNumber(likesElement.text());
+  }
   
 
   
@@ -124,19 +160,29 @@ export function extractTikTokData(html: string): TikTokData {
       }
     });
   }
+  if (!user.totalLikes) {
+    $('[data-e2e*="likes"], [class*="like"], [aria-label*="Likes"]').each((_, elem) => {
+      const text = $(elem).text();
+      const match = text.match(/(\d+\.?\d*[KMB]?)\s*(Likes?|likes?)/i);
+      if (match) {
+        user.totalLikes = parseFormattedNumber(match[1]);
+      }
+    });
+  }
   
 
   
   // Try to extract data from embedded JSON
-  const scriptTags = $('script[type="application/json"], script:contains("followerCount")');
+  const scriptTags = $('script[type="application/json"], script:contains("followerCount"), script:contains("heartCount"), script:contains("likeCount")');
   scriptTags.each((_, elem) => {
     const scriptContent = $(elem).html();
-    if (scriptContent && scriptContent.includes('followerCount')) {
+    if (scriptContent && (scriptContent.includes('followerCount') || scriptContent.includes('heartCount') || scriptContent.includes('likeCount'))) {
       try {
         // Try to parse as JSON directly
         const jsonData = JSON.parse(scriptContent);
         if (jsonData.stats) {
           user.followers = jsonData.stats.followerCount || user.followers;
+          user.totalLikes = jsonData.stats.heartCount || jsonData.stats.likeCount || user.totalLikes;
         }
       } catch (e) {
         // Try to extract JSON from within the script
@@ -145,6 +191,7 @@ export function extractTikTokData(html: string): TikTokData {
           try {
             const stats = JSON.parse(jsonMatch[1]);
             user.followers = stats.followerCount || user.followers;
+            user.totalLikes = stats.heartCount || stats.likeCount || user.totalLikes;
           } catch (e2) {
             // Ignore parsing errors
           }
@@ -342,7 +389,7 @@ export function parseTikTokDataFromJina(jinaResponse: string): TikTokData {
 /**
  * Formats the extracted data into a clean JSON structure
  */
-export function formatTikTokData(data: TikTokData): any {
+export function formatTikTokData(data: TikTokData): FormattedTikTokData {
   return {
     user: {
       username: data.user.username,
@@ -350,7 +397,8 @@ export function formatTikTokData(data: TikTokData): any {
       profileImageUrl: data.user.userImage,
       description: data.user.description || '',
       stats: {
-        followers: data.user.followers
+        followers: data.user.followers,
+        totalLikes: data.user.totalLikes || 0
       }
     },
     videos: data.videos.map(video => ({
